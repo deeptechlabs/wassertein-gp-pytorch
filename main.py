@@ -17,11 +17,11 @@ def parse_args():
     parser.add_argument('--generator', type=str, default='infogan',
                         choices=['infogan', 'resnet'], 
                         help='Generator architecture')
-    parser.add_argument('--epoch', type=int, default=100, 
+    parser.add_argument('--epoch', type=int, default=1500000, 
                         help='The number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=64, 
                         help='The size of batch')
-    parser.add_argument('--datadir', type=str, default='/data/milatmp1/suhubdyd/datasets/', 
+    parser.add_argument('--datadir', type=str, default='/data/milatmp1/suhubdyd/datasets/small-imagenet/', 
                         help='Directory name to save the model')
     parser.add_argument('--save_dir', type=str, default='/data/milatmp1/suhubdyd/models/gans/', 
                         help='Directory name to save the model')
@@ -37,6 +37,7 @@ def parse_args():
     parser.add_argument('--lrD', type=float, default=0.0002)
     parser.add_argument('--beta1', type=float, default=0.5)
     parser.add_argument('--beta2', type=float, default=0.999)
+    parser.add_argument('--z_dim', type=int, default=512)
     parser.add_argument('--lambda_grad_penalty', type=float, default=0.25)
     parser.add_argument('--n_critic', type=float, default=5)
     parser.add_argument('--gpu_mode', type=bool, default=True)

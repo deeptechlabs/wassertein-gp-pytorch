@@ -14,27 +14,25 @@ class discriminator(nn.Module):
         if dataset == 'mnist' or dataset == 'fashion-mnist':
             self.input_height = 28
             self.input_width = 28
-            self.input_dim = 1
-            self.output_dim = 1
+            self.input_channel = 1
+            self.output_channel = 1
         elif dataset == 'celebA':
             self.input_height = 64
             self.input_width = 64
-            self.input_dim = 3
-            self.output_dim = 1
+            self.input_channel = 3
+            self.output_channel = 1
         elif dataset == 'imagenet':
             self.input_height = 64
             self.input_width = 64
-            self.input_dim = 3
-            self.output_dim = 1
+            self.input_channel = 3
+            self.output_channel = 1
 
         # set up the architecture for discriminator
         self.arch = arch
 
         if self.arch == 'infogan':
-
-            # adjust this to a resnet block
             self.conv = nn.Sequential(
-                nn.Conv2d(self.input_dim, 64, 4, 2, 1),
+                nn.Conv2d(self.input_channel, 64, 4, 2, 1),
                 nn.LeakyReLU(0.2),
                 nn.Conv2d(64, 128, 4, 2, 1),
                 nn.BatchNorm2d(128),
@@ -44,15 +42,13 @@ class discriminator(nn.Module):
                 nn.Linear(128 * (self.input_height // 4) * (self.input_width // 4), 1024),
                 nn.BatchNorm1d(1024),
                 nn.LeakyReLU(0.2),
-                nn.Linear(1024, self.output_dim),
+                nn.Linear(1024, self.output_channel),
                 nn.Sigmoid(),
             )
             utils.initialize_weights(self)
 
     def forward(self, input):
-        if self.arch == 'infogan':
-            output = self.conv(input)
-            output = output.view(-1, 128 * (self.input_height // 4) * (self.input_width // 4))
-            output = self.fc(output)
-
+        output = self.conv(input)
+        output = output.view(-1, 128 * (self.input_height // 4) * (self.input_width // 4))
+        output = self.fc(output)
         return output

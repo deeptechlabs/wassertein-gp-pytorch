@@ -24,6 +24,7 @@ class WGAN_GP(object):
         # parameters
         self.epoch = args.epoch
         self.sample_num = 64
+        self.z_dim = args.z_dim
         self.batch_size = args.batch_size
         self.save_dir = args.save_dir
         self.result_dir = args.result_dir
@@ -39,13 +40,8 @@ class WGAN_GP(object):
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
 
         # networks init
-        self.G = generator(self.dataset, self.generator_arch)
+        self.G = generator(self.dataset, self.generator_arch, self.z_dim)
         self.D = discriminator(self.dataset, self.discriminator_arch)
-        print('hihihi')
-        for p in self.G.parameters():
-            print(p)
-        print('hihihihi')
-        print(self.G.parameters())
         self.G_optimizer = optim.Adam(self.G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
         self.D_optimizer = optim.Adam(self.D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
 
@@ -85,7 +81,7 @@ class WGAN_GP(object):
         elif self.dataset == 'imagenet':
             # Data loading code
 
-            traindir = os.path.join(self.datadir, 'imagenet/')
+            traindir = os.path.join(self.datadir, 'test/')
             valdir = os.path.join(args.datadir, 'imagenet/')
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                              std=[0.229, 0.224, 0.225])
@@ -94,7 +90,7 @@ class WGAN_GP(object):
             train_dataset = datasets.ImageFolder(
                 traindir,
                 transforms.Compose([
-                    transforms.RandomResizedCrop(224),
+                    transforms.Resize(64),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                     normalize,
@@ -125,7 +121,7 @@ class WGAN_GP(object):
             self.data_loader = train_loader
         print("Data loaded")
 
-        self.z_dim = 62
+        #self.z_dim = 512
 
         # fixed noise
         if self.gpu_mode:
@@ -168,7 +164,10 @@ class WGAN_GP(object):
                 D_real = self.D(x_)
                 D_real_loss = -torch.mean(D_real)
 
+                #print(type(x_), type(z_))
+                #print(z_.size())
                 G_ = self.G(z_)
+                #print(type(G_))
                 D_fake = self.D(G_)
                 D_fake_loss = torch.mean(D_fake)
 

@@ -1,4 +1,3 @@
-#!/bin/sh
+#!/bin/bash
 source activate dev3
-python main.py --dataset='mnist'
 python main.py --dataset='imagenet'
