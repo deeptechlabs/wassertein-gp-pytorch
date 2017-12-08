@@ -6,20 +6,7 @@ import numpy as np
 import scipy.misc
 import imageio
 import matplotlib.pyplot as plt
-import logging
-import torch
-import math
-import imageio
-import os.path
-import sys
-import tarfile
-import torch
-import numpy as np
-import glob
-import scipy.misc
-import math
-import sys
-import torch.utils.data
+from torchvision import datasets, transforms
 
 from torch import nn
 from torch.autograd import Variable
@@ -29,72 +16,8 @@ from scipy.stats import entropy
 from visdom import Visdom
 from PIL import Image
 
-viz = Visdom(server='http://suhubdy.com', port=51401)
-logger = logging.getLogger('WGAN-GP.viz')
-logger.info('Streaming to visdom server')
-
-_options = dict(
-    use_tanh=False,
-    quantized=False,
-    img=None
-)
-
-def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
-    """Computes the inception score of the generated images imgs
-    imgs -- Torch dataset of (3xHxW) numpy images normalized in the range [-1, 1]
-    cuda -- whether or not to run on GPU
-    batch_size -- batch size for feeding into Inception v3
-    splits -- number of splits
-    """
-    N = len(imgs)
-
-    assert batch_size > 0
-    assert N > batch_size
-
-    # Set up dtype
-    if cuda:
-        dtype = torch.cuda.FloatTensor
-    else:
-        if torch.cuda.is_available():
-            print("WARNING: You have a CUDA device, so you should probably set cuda=True")
-        dtype = torch.FloatTensor
-
-    # Set up dataloader
-    dataloader = torch.utils.data.DataLoader(imgs, batch_size=batch_size)
-
-    # Load inception model
-    inception_model = inception_v3(pretrained=True, transform_input=True).type(dtype)
-    inception_model.eval();
-    up = nn.Upsample(size=(299, 299), mode='bilinear').type(dtype)
-    def get_pred(x):
-        if resize:
-            x = up(x)
-        x = inception_model(x)
-        return F.softmax(x).data.cpu().numpy()
-
-    # Get predictions
-    preds = np.zeros((N, 1000))
-
-    for i, batch in enumerate(dataloader, 0):
-        batch = batch.type(dtype)
-        batchv = Variable(batch)
-        batch_size_i = batch.size()[0]
-
-        preds[i*batch_size:i*batch_size + batch_size_i] = get_pred(batchv)
-
-    # Now compute the mean kl-div
-    split_scores = []
-
-    for k in range(splits):
-        part = preds[k * (N // splits): (k+1) * (N // splits), :]
-        py = np.mean(part, axis=0)
-        scores = []
-        for i in range(part.shape[0]):
-            pyx = part[i, :]
-            scores.append(entropy(pyx, py))
-        split_scores.append(np.exp(np.mean(scores)))
-
-    return np.mean(split_scores), np.std(split_scores)
+# from .inception_score import *
+# from .data import *
 
 def load_mnist(dataset):
     data_dir = os.path.join("/data/milatmp1/suhubdyd/datasets", dataset)
@@ -141,6 +64,21 @@ def load_mnist(dataset):
     y_vec = torch.from_numpy(y_vec).type(torch.FloatTensor)
     return X, y_vec
 
+
+def load_celebA(dir, transform, batch_size, shuffle):
+    # transform = transforms.Compose([
+    #     transforms.CenterCrop(160),
+    #     transform.Scale(64)
+    #     transforms.ToTensor(),
+    #     transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+    # ])
+
+    # data_dir = 'data/celebA'  # this path depends on your computer
+    dset = datasets.ImageFolder(dir, transform)
+    data_loader = torch.utils.data.DataLoader(dset, batch_size, shuffle)
+
+    return data_loader
+
 def print_network(net):
     num_params = 0
     for param in net.parameters():
@@ -151,35 +89,9 @@ def print_network(net):
 def save_images(images, size, image_path):
     return imsave(images, size, image_path)
 
-"""
-def save_images(real_data, fake_data, filename):
-    assert real_data.shape == fake_data.shape
-
-    import warnings
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    import numpy as np
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots()
-    plt.scatter(fake_data[:,0], fake_data[:,1], color='red', label='noise (fake, sampled)')
-    plt.scatter(real_data[:,0], real_data[:,1], color='blue', label='hidden (real, inferred)')
-    #plt.axis('equal')
-    plt.legend(loc='upper right', fancybox=True, shadow=True, fontsize=11)
-    plt.grid(True)
-    plt.xlim(-5, 5)
-    plt.ylim(-5, 5)
-    plt.minorticks_on()
-    plt.xlabel('x', fontsize=14, color='black')
-    plt.ylabel('y', fontsize=14, color='black')
-    plt.title('z samples (of first two dimensions)')
-    plt.savefig(filename)
-    plt.close()
-"""
-
 def imsave(images, size, path):
     image = np.squeeze(merge(images, size))
+    viz = Visdom(server='http://suhubdy.com', port=51401)
     return scipy.misc.imsave(path, image)
 
 def scale_to_unit_interval(ndar, eps=1e-8):
@@ -188,7 +100,6 @@ def scale_to_unit_interval(ndar, eps=1e-8):
     ndar -= ndar.min()
     ndar *= 1.0 / (ndar.max() + eps)
     return ndar
-
 
 def merge(images, size):
     h, w = images.shape[1], images.shape[2]
@@ -250,30 +161,29 @@ def initialize_weights(net):
             m.bias.data.zero_()
 
 """
-if __name__ == '__main__':
-    class IgnoreLabelDataset(torch.utils.data.Dataset):
-        def __init__(self, orig):
-            self.orig = orig
+def save_images(real_data, fake_data, filename):
+    assert real_data.shape == fake_data.shape
 
-        def __getitem__(self, index):
-            return self.orig[index][0]
+    import warnings
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    import numpy as np
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
 
-        def __len__(self):
-            return len(self.orig)
-
-    import torchvision.datasets as dset
-    import torchvision.transforms as transforms
-
-    cifar = dset.CIFAR10(root='data/', download=True,
-                             transform=transforms.Compose([
-                                 transforms.Scale(32),
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                             ])
-    )
-
-    IgnoreLabelDataset(cifar)
-
-    print ("Calculating Inception Score...")
-    print (inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=32, resize=True, splits=10))
+    fig, ax = plt.subplots()
+    plt.scatter(fake_data[:,0], fake_data[:,1], color='red', label='noise (fake, sampled)')
+    plt.scatter(real_data[:,0], real_data[:,1], color='blue', label='hidden (real, inferred)')
+    #plt.axis('equal')
+    plt.legend(loc='upper right', fancybox=True, shadow=True, fontsize=11)
+    plt.grid(True)
+    plt.xlim(-5, 5)
+    plt.ylim(-5, 5)
+    plt.minorticks_on()
+    plt.xlabel('x', fontsize=14, color='black')
+    plt.ylabel('y', fontsize=14, color='black')
+    plt.title('z samples (of first two dimensions)')
+    plt.savefig(filename)
+    plt.close()
 """
+

@@ -5,108 +5,19 @@ import os
 import pickle
 import numpy as np
 
-import torch
-import torch.nn as nn
 import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.distributed as dist
 import torch.optim as optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import torchvision.models as models
-
 from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-class generator(nn.Module):
-    def __init__(self, dataset = 'celeba'):
-        super(generator, self).__init__()
-        if dataset == 'mnist' or dataset == 'fashion-mnist':
-            self.input_height = 28
-            self.input_width = 28
-            self.input_dim = 62
-            self.output_dim = 1
-        elif dataset == 'celebA':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_dim = 62
-            self.output_dim = 3
-        elif dataset == 'imagenet':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_dim = 3
-            self.output_dim = 1
 
-        self.fc = nn.Sequential(
-            nn.Linear(self.input_dim, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            nn.Linear(1024, 128 * (self.input_height // 4) * (self.input_width // 4)),
-            nn.BatchNorm1d(128 * (self.input_height // 4) * (self.input_width // 4)),
-            nn.ReLU(),
-        )
-        self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, self.output_dim, 4, 2, 1),
-            nn.Sigmoid(),
-        )
-        utils.initialize_weights(self)
-
-    def forward(self, input):
-        x = self.fc(input)
-        x = x.view(-1, 128, (self.input_height // 4), (self.input_width // 4))
-        x = self.deconv(x)
-
-        return x
-
-class discriminator(nn.Module):
-    # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
-    # Architecture : (64)4c2s-(128)4c2s_BL-FC1024_BL-FC1_S
-    def __init__(self, dataset = 'celebA'):
-        super(discriminator, self).__init__()
-        if dataset == 'mnist' or dataset == 'fashion-mnist':
-            self.input_height = 28
-            self.input_width = 28
-            self.input_dim = 1
-            self.output_dim = 1
-        elif dataset == 'celebA':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_dim = 3
-            self.output_dim = 1
-        elif dataset == 'imagenet':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_dim = 3
-            self.output_dim = 1
-
-        self.conv = nn.Sequential(
-            nn.Conv2d(self.input_dim, 64, 4, 2, 1),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(64, 128, 4, 2, 1),
-            nn.BatchNorm2d(128),
-            nn.LeakyReLU(0.2),
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(128 * (self.input_height // 4) * (self.input_width // 4), 1024),
-            nn.BatchNorm1d(1024),
-            nn.LeakyReLU(0.2),
-            nn.Linear(1024, self.output_dim),
-            nn.Sigmoid(),
-        )
-        utils.initialize_weights(self)
-
-    def forward(self, input):
-        x = self.conv(input)
-        x = x.view(-1, 128 * (self.input_height // 4) * (self.input_width // 4))
-        x = self.fc(x)
-
-        return x
+from generator import generator
+from discriminator import discriminator
 
 class WGAN_GP(object):
     def __init__(self, args):
@@ -119,7 +30,8 @@ class WGAN_GP(object):
         self.dataset = args.dataset
         self.datadir = args.datadir
         self.log_dir = args.log_dir
-        self.distributed = args.distributed
+        self.generator_arch = args.generator
+        self.discriminator_arch = args.discriminator
         self.model_name = 'wgan-gp'
         self.nThreads = args.nThreads
         self.gpu_mode = args.gpu_mode
@@ -127,8 +39,13 @@ class WGAN_GP(object):
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
 
         # networks init
-        self.G = generator(self.dataset)
-        self.D = discriminator(self.dataset)
+        self.G = generator(self.dataset, self.generator_arch)
+        self.D = discriminator(self.dataset, self.discriminator_arch)
+        print('hihihi')
+        for p in self.G.parameters():
+            print(p)
+        print('hihihihi')
+        print(self.G.parameters())
         self.G_optimizer = optim.Adam(self.G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
         self.D_optimizer = optim.Adam(self.D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
 
@@ -168,11 +85,12 @@ class WGAN_GP(object):
         elif self.dataset == 'imagenet':
             # Data loading code
 
-            traindir = os.path.join(self.datadir, 'train_64x64')
-            #valdir = os.path.join(args.data, 'val_64x64')
+            traindir = os.path.join(self.datadir, 'imagenet/')
+            valdir = os.path.join(args.datadir, 'imagenet/')
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                              std=[0.229, 0.224, 0.225])
 
+            print('Loading training data')
             train_dataset = datasets.ImageFolder(
                 traindir,
                 transforms.Compose([
@@ -182,11 +100,9 @@ class WGAN_GP(object):
                     normalize,
                 ]))
 
-            if self.distributed:
-                train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-            else:
-                train_sampler = None
+            train_sampler = None
 
+            print('Loading into memory data')
             train_loader = torch.utils.data.DataLoader(train_dataset,
                                                        batch_size=self.batch_size,
                                                        shuffle=(train_sampler is None),
@@ -261,6 +177,8 @@ class WGAN_GP(object):
                     alpha = torch.rand(x_.size()).cuda()
                 else:
                     alpha = torch.rand(x_.size())
+                # the only reason the imagenet might fail 
+                # is that the miss dimension
 
                 x_hat = Variable(alpha * x_.data + (1 - alpha) * G_.data, requires_grad=True)
 
@@ -336,7 +254,7 @@ class WGAN_GP(object):
         else:
             samples = samples.data.numpy().transpose(0, 2, 3, 1)
 
-        utils.save_images(samples[:image_frame_dim * image_frame_dim, :, :, :], (image_frame_dim, image_frame_dim), self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' + self.model_name + '_epoch%03d' % epoch + '.png')
+        utils.save_images(samples[:image_frame_dim * image_frame_dim, :, :, :], [image_frame_dim, image_frame_dim], self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' + self.model_name + '_epoch%03d' % epoch + '.png')
 
     def save(self):
         save_dir = os.path.join(self.save_dir, self.dataset, self.model_name)
