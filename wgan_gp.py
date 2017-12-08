@@ -14,7 +14,7 @@ import torchvision.datasets as datasets
 from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
+from visdom import Visdom
 
 from generator import generator
 from discriminator import discriminator
@@ -38,6 +38,7 @@ class WGAN_GP(object):
         self.gpu_mode = args.gpu_mode
         self.lambda_ = args.lambda_grad_penalty #0.25
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
+        self.vis = Visdom(server=args.visdom_server, port=args.visdom_port)
 
         # networks init
         self.G = generator(self.dataset, self.generator_arch, self.z_dim)
@@ -253,7 +254,7 @@ class WGAN_GP(object):
         else:
             samples = samples.data.numpy().transpose(0, 2, 3, 1)
 
-        utils.save_images(samples[:image_frame_dim * image_frame_dim, :, :, :], [image_frame_dim, image_frame_dim], self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' + self.model_name + '_epoch%03d' % epoch + '.png')
+        utils.save_images(self.vis, samples[:image_frame_dim * image_frame_dim, :, :, :], [image_frame_dim, image_frame_dim], self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' + self.model_name + '_epoch%03d' % epoch + '.png')
 
     def save(self):
         save_dir = os.path.join(self.save_dir, self.dataset, self.model_name)

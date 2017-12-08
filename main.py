@@ -31,8 +31,10 @@ def parse_args():
                         help='Directory name to save training logs')
     parser.add_argument('--visdom', type=str, default='0', 
                         help='Display results on Visdom')
-    parser.add_argument('--visdom-sever', type=str, default='http://suhubdy.com', 
+    parser.add_argument('--visdom_server', type=str, default='http://suhubdy.com', 
                         help='Visdom Server to display results')
+    parser.add_argument('--visdom_port', type=int, default=51401, 
+                        help='Visdom Server port')
     parser.add_argument('--lrG', type=float, default=0.0002)
     parser.add_argument('--lrD', type=float, default=0.0002)
     parser.add_argument('--beta1', type=float, default=0.5)

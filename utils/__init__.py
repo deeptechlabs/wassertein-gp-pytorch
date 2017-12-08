@@ -86,12 +86,20 @@ def print_network(net):
     print(net)
     print('Total number of parameters: %d' % num_params)
 
-def save_images(images, size, image_path):
-    return imsave(images, size, image_path)
+def save_images(vis, images, size, image_path):
+    return imsave(vis, images, size, image_path)
 
-def imsave(images, size, path):
-    image = np.squeeze(merge(images, size))
-    viz = Visdom(server='http://suhubdy.com', port=51401)
+def imsave(vis, images, size, path):
+    image = merge(images, size)
+    image = np.squeeze(image)
+    arr = np.array(image)
+    if arr.ndim == 3:
+        arr = arr.transpose(2, 0, 1)
+    #vis = Visdom(server='http://suhubdy.com', port=51401)
+    vis.image(arr,
+              opts=dict(title='GANs', caption='GANs'),
+              win='win',
+              env='main')
     return scipy.misc.imsave(path, image)
 
 def scale_to_unit_interval(ndar, eps=1e-8):
