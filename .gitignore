@@ -106,5 +106,10 @@ venv.bak/
 *.pyc
 *.out
 logs/*
+*.tar.gz
+*.tar
 
+utils/data/*
+utils/logs/*
+logs/*
 # End of https://www.gitignore.io/api/python

@@ -1,10 +1,17 @@
 import torch
+import numpy as np
+import torchvision.datasets as dset
+import torchvision.transforms as transforms
+
+from scipy.stats import entropy
+
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
 from torchvision.models.inception import inception_v3
 
-def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
+
+def inception_score(imgs, cuda=True, batch_size=32, dim=1, resize=False, splits=1):
     """Computes the inception score of the generated images imgs
     imgs -- Torch dataset of (3xHxW) numpy images normalized in the range [-1, 1]
     cuda -- whether or not to run on GPU
@@ -14,7 +21,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     N = len(imgs)
 
     assert batch_size > 0
-    assert N > batch_size
+    assert N >= batch_size
 
     # Set up dtype
     if cuda:
@@ -25,7 +32,8 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
         dtype = torch.FloatTensor
 
     # Set up dataloader
-    dataloader = torch.utils.data.DataLoader(imgs, batch_size=batch_size)
+    dataloader = torch.utils.data.DataLoader(imgs, 
+                                            batch_size=batch_size)
 
     # Load inception model
     inception_model = inception_v3(pretrained=True, transform_input=True).type(dtype)
@@ -35,7 +43,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
         if resize:
             x = up(x)
         x = inception_model(x)
-        return F.softmax(x).data.cpu().numpy()
+        return F.softmax(x, dim).data.cpu().numpy()
 
     # Get predictions
     preds = np.zeros((N, 1000))
@@ -73,12 +81,10 @@ if __name__ == '__main__':
         def __len__(self):
             return len(self.orig)
 
-    import torchvision.datasets as dset
-    import torchvision.transforms as transforms
 
     cifar = dset.CIFAR10(root='data/', download=True,
                              transform=transforms.Compose([
-                                 transforms.Scale(32),
+                                 transforms.Resize(32),
                                  transforms.ToTensor(),
                                  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                              ])
@@ -86,5 +92,9 @@ if __name__ == '__main__':
 
     IgnoreLabelDataset(cifar)
 
+    data= IgnoreLabelDataset(cifar)
+    #print(data)
+    #print(type(data))
+
     print ("Calculating Inception Score...")
-    print (inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=32, resize=True, splits=10))
+    print (inception_score(data, cuda=True, batch_size=32, resize=True, splits=10))

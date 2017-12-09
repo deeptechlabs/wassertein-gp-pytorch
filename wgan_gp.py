@@ -4,26 +4,29 @@ import time
 import os
 import pickle
 import numpy as np
-
 import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import torch.utils.data.distributed
+import torchvision
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+
 from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from visdom import Visdom
-
 from generator import generator
 from discriminator import discriminator
+from utils.inception_score import inception_score
+from sklearn.preprocessing import scale
 
 class WGAN_GP(object):
     def __init__(self, args):
         # parameters
         self.epoch = args.epoch
-        self.sample_num = 64
+        self.model_name = 'wgan-gp'
+        self.sample_num = args.sample_num
         self.z_dim = args.z_dim
         self.batch_size = args.batch_size
         self.save_dir = args.save_dir
@@ -33,11 +36,11 @@ class WGAN_GP(object):
         self.log_dir = args.log_dir
         self.generator_arch = args.generator
         self.discriminator_arch = args.discriminator
-        self.model_name = 'wgan-gp'
         self.nThreads = args.nThreads
         self.gpu_mode = args.gpu_mode
         self.lambda_ = args.lambda_grad_penalty #0.25
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
+        self.visualize = args.visualize # 5 the number of iterations of the critic per generator iteration
         self.vis = Visdom(server=args.visdom_server, port=args.visdom_port)
 
         # networks init
@@ -82,7 +85,7 @@ class WGAN_GP(object):
         elif self.dataset == 'imagenet':
             # Data loading code
 
-            traindir = os.path.join(self.datadir, 'test/')
+            traindir = os.path.join(self.datadir, 'train/')
             valdir = os.path.join(args.datadir, 'imagenet/')
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                              std=[0.229, 0.224, 0.225])
@@ -102,7 +105,7 @@ class WGAN_GP(object):
             print('Loading into memory data')
             train_loader = torch.utils.data.DataLoader(train_dataset,
                                                        batch_size=self.batch_size,
-                                                       shuffle=(train_sampler is None),
+                                                       shuffle=True,
                                                        num_workers=self.nThreads,
                                                        pin_memory=True,
                                                        sampler=train_sampler)
@@ -249,12 +252,34 @@ class WGAN_GP(object):
 
             samples = self.G(sample_z_)
 
+        copy_samples = samples
+
         if self.gpu_mode:
             samples = samples.cpu().data.numpy().transpose(0, 2, 3, 1)
+            presamples = copy_samples.cpu().data.numpy()
+            presamples = 2*(presamples - np.max(presamples))/-np.ptp(presamples)-1
         else:
             samples = samples.data.numpy().transpose(0, 2, 3, 1)
+            presamples = copy_samples.data.numpy()
 
-        utils.save_images(self.vis, samples[:image_frame_dim * image_frame_dim, :, :, :], [image_frame_dim, image_frame_dim], self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' + self.model_name + '_epoch%03d' % epoch + '.png')
+        images = samples[:image_frame_dim * image_frame_dim, :, :, :]
+
+        # Calculate inception score
+
+        score = inception_score(presamples,
+                                cuda=True,
+                                resize=True,
+                                batch_size=self.batch_size)
+
+        # display inception mean and std
+
+        print("Inception score mean and std are", score)
+
+        # save images and display if set
+        utils.save_images(self.vis, images, [image_frame_dim, image_frame_dim], 
+                        self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' 
+                        + self.model_name + '_epoch%03d' % epoch + '.png', visualize=self.visualize)
+
 
     def save(self):
         save_dir = os.path.join(self.save_dir, self.dataset, self.model_name)

@@ -16,8 +16,7 @@ from scipy.stats import entropy
 from visdom import Visdom
 from PIL import Image
 
-# from .inception_score import *
-# from .data import *
+from .inception_score import inception_score
 
 def load_mnist(dataset):
     data_dir = os.path.join("/data/milatmp1/suhubdyd/datasets", dataset)
@@ -86,20 +85,21 @@ def print_network(net):
     print(net)
     print('Total number of parameters: %d' % num_params)
 
-def save_images(vis, images, size, image_path):
-    return imsave(vis, images, size, image_path)
+def save_images(vis, images, size, image_path, visualize=True):
+    return imsave(vis, images, size, image_path, visualize=True)
 
-def imsave(vis, images, size, path):
+def imsave(vis, images, size, path, visualize=True):
     image = merge(images, size)
     image = np.squeeze(image)
-    arr = np.array(image)
-    if arr.ndim == 3:
-        arr = arr.transpose(2, 0, 1)
-    #vis = Visdom(server='http://suhubdy.com', port=51401)
-    vis.image(arr,
-              opts=dict(title='GANs', caption='GANs'),
-              win='win',
-              env='main')
+    if (visualize):
+        arr = np.array(image)
+        if arr.ndim == 3:
+            arr = arr.transpose(2, 0, 1)
+        #vis = Visdom(server='http://suhubdy.com', port=51401)
+        vis.image(arr,
+                  opts=dict(title='GANs', caption='GANs'),
+                  win='win',
+                  env='main')
     return scipy.misc.imsave(path, image)
 
 def scale_to_unit_interval(ndar, eps=1e-8):

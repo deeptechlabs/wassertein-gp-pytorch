@@ -27,9 +27,9 @@ def parse_args():
                         help='Directory name to save the model')
     parser.add_argument('--result_dir', type=str, default='/data/milatmp1/suhubdyd/models/gans/imagesgen/', 
                         help='Directory name to save the generated images')
-    parser.add_argument('--log_dir', type=str, default='logs', 
+    parser.add_argument('--log_dir', type=str, default='/data/milatmp1/suhubdyd/models/gans/logs/', 
                         help='Directory name to save training logs')
-    parser.add_argument('--visdom', type=str, default='0', 
+    parser.add_argument('--visualize', type=bool, default=True, 
                         help='Display results on Visdom')
     parser.add_argument('--visdom_server', type=str, default='http://suhubdy.com', 
                         help='Visdom Server to display results')
@@ -40,6 +40,7 @@ def parse_args():
     parser.add_argument('--beta1', type=float, default=0.5)
     parser.add_argument('--beta2', type=float, default=0.999)
     parser.add_argument('--z_dim', type=int, default=512)
+    parser.add_argument('--sample_num', type=int, default=64)
     parser.add_argument('--lambda_grad_penalty', type=float, default=0.25)
     parser.add_argument('--n_critic', type=float, default=5)
     parser.add_argument('--gpu_mode', type=bool, default=True)
