@@ -11,17 +11,17 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='imagenet',
                         choices=['imagenet', 'mnist', 'fashion-mnist', 'celebA'], 
                         help='The name of dataset')
-    parser.add_argument('--discriminator', type=str, default='infogan',
-                        choices=['infogan', 'resnet'], 
+    parser.add_argument('--discriminator', type=str, default='normal',
+                        choices=['normal', 'resnet'], 
                         help='Discriminator architecture')
-    parser.add_argument('--generator', type=str, default='infogan',
-                        choices=['infogan', 'resnet'], 
+    parser.add_argument('--generator', type=str, default='normal',
+                        choices=['normal', 'resnet'], 
                         help='Generator architecture')
     parser.add_argument('--epoch', type=int, default=1500000, 
                         help='The number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=64, 
                         help='The size of batch')
-    parser.add_argument('--datadir', type=str, default='/data/milatmp1/suhubdyd/datasets/small-imagenet/', 
+    parser.add_argument('--datadir', type=str, default='/data/milatmp1/suhubdyd/datasets/', 
                         help='Directory name to save the model')
     parser.add_argument('--save_dir', type=str, default='/data/milatmp1/suhubdyd/models/gans/', 
                         help='Directory name to save the model')
@@ -35,6 +35,8 @@ def parse_args():
                         help='Visdom Server to display results')
     parser.add_argument('--visdom_port', type=int, default=51401, 
                         help='Visdom Server port')
+    parser.add_argument('--env_display', type=str, default='main', 
+                        help='Visdom Server environment name')
     parser.add_argument('--lrG', type=float, default=0.0002)
     parser.add_argument('--lrD', type=float, default=0.0002)
     parser.add_argument('--beta1', type=float, default=0.5)
@@ -44,6 +46,7 @@ def parse_args():
     parser.add_argument('--lambda_grad_penalty', type=float, default=0.25)
     parser.add_argument('--n_critic', type=float, default=5)
     parser.add_argument('--gpu_mode', type=bool, default=True)
+    parser.add_argument('--calculate_inception', type=bool, default=False)
     parser.add_argument('--nThreads', '-j', default=5, type=int, metavar='N',
                         help='number of data loading threads (default: 2)')
     return check_args(parser.parse_args())

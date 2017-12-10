@@ -20,12 +20,13 @@ from generator import generator
 from discriminator import discriminator
 from utils.inception_score import inception_score
 from sklearn.preprocessing import scale
+from dataloader import dataloader
 
 class WGAN_GP(object):
     def __init__(self, args):
         # parameters
-        self.epoch = args.epoch
         self.model_name = 'wgan-gp'
+        self.epoch = args.epoch
         self.sample_num = args.sample_num
         self.z_dim = args.z_dim
         self.batch_size = args.batch_size
@@ -41,11 +42,13 @@ class WGAN_GP(object):
         self.lambda_ = args.lambda_grad_penalty #0.25
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
         self.visualize = args.visualize # 5 the number of iterations of the critic per generator iteration
+        self.env_display = args.env_display
         self.vis = Visdom(server=args.visdom_server, port=args.visdom_port)
+        self.calculate_inception = args.calculate_inception
 
         # networks init
-        self.G = generator(self.dataset, self.generator_arch, self.z_dim)
-        self.D = discriminator(self.dataset, self.discriminator_arch)
+        self.G = generator(self.dataset, self.z_dim)
+        self.D = discriminator(self.dataset)
         self.G_optimizer = optim.Adam(self.G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
         self.D_optimizer = optim.Adam(self.D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
 
@@ -58,71 +61,10 @@ class WGAN_GP(object):
         utils.print_network(self.D)
         print('-----------------------------------------------')
 
-        # load dataset
-        if self.dataset == 'mnist':
-            datadir = os.path.join(self.datadir, 'mnist')
-            self.data_loader = DataLoader(datasets.MNIST(datadir,
-                                                        train=True,
-                                                        download=True,
-                                                        transform=transforms.Compose(
-                                                             [transforms.ToTensor()])),
-                                          batch_size=self.batch_size, shuffle=True)
-        elif self.dataset == 'fashion-mnist':
-            datadir = os.path.join(self.datadir, 'fashion-mnist')
-            self.data_loader = DataLoader(datasets.FashionMNIST(datadir,
-                                                                train=True,
-                                                                download=True,
-                                                                transform=transforms.Compose(
-                                                                [transforms.ToTensor()])),
-                                                                batch_size=self.batch_size, shuffle=True)
-        elif self.dataset == 'celebA':
-            datadir = os.path.join(self.datadir, 'celebA')
-            self.data_loader = utils.load_celebA(datadir,
-                                                transform=transforms.Compose(
-                                                [transforms.CenterCrop(160), transforms.Scale(64), transforms.ToTensor()]), 
-                                                batch_size=self.batch_size,
-                                                shuffle=True)
-        elif self.dataset == 'imagenet':
-            # Data loading code
+        data = dataloader(self.dataset, self.datadir, self.batch_size)
 
-            traindir = os.path.join(self.datadir, 'train/')
-            valdir = os.path.join(args.datadir, 'imagenet/')
-            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                             std=[0.229, 0.224, 0.225])
+        self.data_loader = data.load()
 
-            print('Loading training data')
-            train_dataset = datasets.ImageFolder(
-                traindir,
-                transforms.Compose([
-                    transforms.Resize(64),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    normalize,
-                ]))
-
-            train_sampler = None
-
-            print('Loading into memory data')
-            train_loader = torch.utils.data.DataLoader(train_dataset,
-                                                       batch_size=self.batch_size,
-                                                       shuffle=True,
-                                                       num_workers=self.nThreads,
-                                                       pin_memory=True,
-                                                       sampler=train_sampler)
-            """
-            val_loader = torch.utils.data.DataLoader(
-                                                datasets.ImageFolder(valdir, transforms.Compose([
-                                                    transforms.Resize(256),
-                                                    transforms.CenterCrop(224),
-                                                    transforms.ToTensor(),
-                                                    normalize,
-                                                ])),
-                                            batch_size=args.batch_size, shuffle=False,
-                                            num_workers=args.workers, pin_memory=True)
-
-            """
-            print("Trying to load data into memory")
-            self.data_loader = train_loader
         print("Data loaded")
 
         #self.z_dim = 512
@@ -168,10 +110,7 @@ class WGAN_GP(object):
                 D_real = self.D(x_)
                 D_real_loss = -torch.mean(D_real)
 
-                #print(type(x_), type(z_))
-                #print(z_.size())
                 G_ = self.G(z_)
-                #print(type(G_))
                 D_fake = self.D(G_)
                 D_fake_loss = torch.mean(D_fake)
 
@@ -261,24 +200,27 @@ class WGAN_GP(object):
         else:
             samples = samples.data.numpy().transpose(0, 2, 3, 1)
             presamples = copy_samples.data.numpy()
+            presamples = 2*(presamples - np.max(presamples))/-np.ptp(presamples)-1
 
         images = samples[:image_frame_dim * image_frame_dim, :, :, :]
 
         # Calculate inception score
+        if self.calculate_inception:
 
-        score = inception_score(presamples,
-                                cuda=True,
-                                resize=True,
-                                batch_size=self.batch_size)
+            score = inception_score(presamples,
+                                    cuda=True,
+                                    resize=True,
+                                    batch_size=self.batch_size)
 
-        # display inception mean and std
+            # display inception mean and std
 
-        print("Inception score mean and std are", score)
+            print("Inception score mean and std are", score)
 
         # save images and display if set
         utils.save_images(self.vis, images, [image_frame_dim, image_frame_dim], 
                         self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' 
-                        + self.model_name + '_epoch%03d' % epoch + '.png', visualize=self.visualize)
+                        + self.model_name + '_epoch%03d' % epoch + '.png', env=self.env_display,
+                        visualize=self.visualize)
 
 
     def save(self):
