@@ -42,7 +42,7 @@ class WGAN_GP(object):
         self.lambda_ = args.lambda_grad_penalty #0.25
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
         self.visualize = args.visualize # 5 the number of iterations of the critic per generator iteration
-        self.env_display = args.env_display
+        self.env_display = str(args.env_display)
         self.vis = Visdom(server=args.visdom_server, port=args.visdom_port)
         self.calculate_inception = args.calculate_inception
 
