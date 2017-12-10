@@ -57,6 +57,10 @@ class generator(nn.Module):
         elif self.dataset == 'celebA':
             output = self.fc(input)
 
+        elif self.dataset == 'small-imagenet':
+            output = input.view(-1, self.input_channel * self.input_height * self.input_width)
+            output = self.fc(output)
+
         elif self.dataset == 'imagenet':
             output = input.view(-1, self.input_channel * self.input_height * self.input_width)
             output = self.fc(output)
