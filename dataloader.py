@@ -11,10 +11,11 @@ from utils import *
 
 
 class dataloader():
-    def __init__(self, dataset, datadir, batch_size):
+    def __init__(self, dataset, datadir, batch_size, workers):
         self.dataset = dataset
         self.datadir = datadir
         self.batch_size = batch_size
+        self.workers = workers
 
     def load(self):
         # load dataset
@@ -70,14 +71,14 @@ class dataloader():
             small_imagenet_loader = torch.utils.data.DataLoader(small_imagenet_dataset,
                                                        batch_size=self.batch_size,
                                                        shuffle=True,
-                                                       num_workers=self.nThreads,
+                                                       num_workers=self.workers,
                                                        pin_memory=True,
                                                        sampler=train_sampler)
             return small_imagenet_loader
 
         elif self.dataset == 'imagenet':
 
-            full_imagenet_dir = os.path.join(args.datadir, 'imagenet/')
+            full_imagenet_dir = os.path.join(self.datadir, 'imagenet/')
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                              std=[0.229, 0.224, 0.225])
 
@@ -91,8 +92,8 @@ class dataloader():
 
 
             full_imagenet_loader = torch.utils.data.DataLoader(full_imagenet,
-                                                        batch_size=args.batch_size,
+                                                        batch_size=self.batch_size,
                                                         shuffle=True,
-                                                        num_workers=args.workers,
+                                                        num_workers=self.workers,
                                                         pin_memory=True)
             return full_imagenet_loader

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 class generator(nn.Module):
-    def __init__(self, dataset='imagenet', z_dim=512):
+    def __init__(self, dataset='small-imagenet', z_dim=512):
         super(generator, self).__init__()
         self.dataset = dataset
         self.z_dim = z_dim
@@ -22,6 +22,13 @@ class generator(nn.Module):
             self.input_channel = z_dim
             self.output_channel = 3
         elif self.dataset == 'imagenet':
+            self.input_height = 1
+            self.input_width = 1
+            self.input_channel = self.z_dim # this is hidden size
+            self.output_height = 64 # this is size of height
+            self.output_width = 64 # this is size of image w
+            self.output_channel = 3 # this is color
+        elif self.dataset == 'small-imagenet':
             self.input_height = 1
             self.input_width = 1
             self.input_channel = self.z_dim # this is hidden size

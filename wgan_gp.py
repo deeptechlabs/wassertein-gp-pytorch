@@ -61,7 +61,7 @@ class WGAN_GP(object):
         utils.print_network(self.D)
         print('-----------------------------------------------')
 
-        data = dataloader(self.dataset, self.datadir, self.batch_size)
+        data = dataloader(self.dataset, self.datadir, self.batch_size, self.nThreads)
 
         self.data_loader = data.load()
 

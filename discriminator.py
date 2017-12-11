@@ -9,7 +9,7 @@ from torchvision import datasets, transforms
 class discriminator(nn.Module):
     # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
     # Architecture : (64)4c2s-(128)4c2s_BL-FC1024_BL-FC1_S
-    def __init__(self, dataset='imagenet'):
+    def __init__(self, dataset='small-imagenet'):
         super(discriminator, self).__init__()
         if dataset == 'mnist' or dataset == 'fashion-mnist':
             self.input_height = 28
@@ -26,6 +26,12 @@ class discriminator(nn.Module):
             self.input_width = 64
             self.input_channel = 3
             self.output_channel = 1
+        elif dataset == 'small-imagenet':
+            self.input_height = 64
+            self.input_width = 64
+            self.input_channel = 3
+            self.output_channel = 1
+
 
 
         self.conv = nn.Sequential(

@@ -8,8 +8,8 @@ from wgan_gp import WGAN_GP
 def parse_args():
     desc = "Pytorch implementation of GAN collections"
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument('--dataset', type=str, default='imagenet',
-                        choices=['imagenet', 'mnist', 'fashion-mnist', 'celebA'], 
+    parser.add_argument('--dataset', type=str, default='small-imagenet',
+                        choices=['imagenet', 'small-imagenet', 'mnist', 'fashion-mnist', 'celebA'], 
                         help='The name of dataset')
     parser.add_argument('--discriminator', type=str, default='normal',
                         choices=['normal', 'resnet'], 
