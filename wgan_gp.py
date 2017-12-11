@@ -16,11 +16,13 @@ from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from visdom import Visdom
-from generator import generator
-from discriminator import discriminator
 from utils.inception_score import inception_score
+from utils import dcgan_weights_init
 from sklearn.preprocessing import scale
 from dataloader import dataloader
+
+from generator import *
+from discriminator import *
 
 class WGAN_GP(object):
     def __init__(self, args):
@@ -42,13 +44,24 @@ class WGAN_GP(object):
         self.lambda_ = args.lambda_grad_penalty #0.25
         self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
         self.visualize = args.visualize # 5 the number of iterations of the critic per generator iteration
+        self.ngpu = args.ngpu
         self.env_display = str(args.env_display)
         self.vis = Visdom(server=args.visdom_server, port=args.visdom_port)
         self.calculate_inception = args.calculate_inception
 
         # networks init
-        self.G = generator(self.dataset, self.z_dim)
-        self.D = discriminator(self.dataset)
+        if self.generator_arch == 'infogan':
+            self.G = INFOGAN_generator(self.dataset, self.z_dim)
+        elif self.generator_arch == 'dcgan':
+            self.G = DCGAN_generator(self.ngpu)
+            self.G.apply(dcgan_weights_init)
+
+        if self.generator_arch == 'infogan':
+            self.D = INFOGAN_discriminator(self.dataset)
+        elif self.generator_arch == 'dcgan':
+            self.D = DCGAN_discriminator(self.ngpu)
+            self.D.apply(dcgan_weights_init)
+
         self.G_optimizer = optim.Adam(self.G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
         self.D_optimizer = optim.Adam(self.D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
 
