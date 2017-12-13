@@ -8,16 +8,13 @@ import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
 from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
 from visdom import Visdom
 from utils.inception_score import inception_score
-from utils import dcgan_weights_init
 from sklearn.preprocessing import scale
 from dataloader import dataloader
 
@@ -54,13 +51,15 @@ class WGAN_GP(object):
             self.G = INFOGAN_generator(self.dataset, self.z_dim)
         elif self.generator_arch == 'dcgan':
             self.G = DCGAN_generator(self.ngpu)
-            self.G.apply(dcgan_weights_init)
+        elif self.generator_arch == 'resnet':
+            self.G = build_generator(self.ngpu)
 
-        if self.generator_arch == 'infogan':
+        if self.discriminator_arch == 'infogan':
             self.D = INFOGAN_discriminator(self.dataset)
-        elif self.generator_arch == 'dcgan':
+        elif self.discriminator_arch == 'dcgan':
             self.D = DCGAN_discriminator(self.ngpu)
-            self.D.apply(dcgan_weights_init)
+        elif self.discriminator_arch == 'resnet':
+            self.D = build_discriminator(self.ngpu)
 
         self.G_optimizer = optim.Adam(self.G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
         self.D_optimizer = optim.Adam(self.D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
@@ -84,9 +83,11 @@ class WGAN_GP(object):
 
         # fixed noise
         if self.gpu_mode:
-            self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim)).cuda(), volatile=True)
+            self.sample_z_ = Variable(torch.rand((self.batch_size, 3, 64, 64)).cuda(), volatile=True)
+            #self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim, 1, 1)).cuda(), volatile=True)
         else:
-            self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim)), volatile=True)
+            self.sample_z_ = Variable(torch.rand((self.batch_size, 3, 64, 64)), volatile=True)
+            #self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim, 1, 1)), volatile=True)
 
     def train(self):
         self.train_hist = {}
@@ -96,9 +97,9 @@ class WGAN_GP(object):
         self.train_hist['total_time'] = []
 
         if self.gpu_mode:
-            self.y_real_, self.y_fake_ = Variable(torch.ones(self.batch_size, 1).cuda()), Variable(torch.zeros(self.batch_size, 1).cuda())
+            self.y_real_, self.y_fake_ = Variable(torch.ones((self.batch_size, 3, 1, 1)).cuda()), Variable(torch.zeros((self.batch_size, 3, 1, 1)).cuda())
         else:
-            self.y_real_, self.y_fake_ = Variable(torch.ones(self.batch_size, 1)), Variable(torch.zeros(self.batch_size, 1))
+            self.y_real_, self.y_fake_ = Variable(torch.ones((self.batch_size, 3, 1, 1))), Variable(torch.zeros((self.batch_size, 3, 1, 1)))
 
         self.D.train()
         print('training start!!')
@@ -110,20 +111,26 @@ class WGAN_GP(object):
                 if iter == self.data_loader.dataset.__len__() // self.batch_size:
                     break
 
-                z_ = torch.rand((self.batch_size, self.z_dim))
+                #z_ = torch.rand((self.batch_size, self.z_dim, 1, 1))
+
+                z_ = torch.rand((self.batch_size, 3, 64, 64))
 
                 if self.gpu_mode:
                     x_, z_ = Variable(x_.cuda()), Variable(z_.cuda())
                 else:
                     x_, z_ = Variable(x_), Variable(z_)
-
+                #print(x_.size())
+                #print(z_.size())
                 # update D network
                 self.D_optimizer.zero_grad()
 
                 D_real = self.D(x_)
                 D_real_loss = -torch.mean(D_real)
 
+                #print(z_)
+
                 G_ = self.G(z_)
+                #print(G_)
                 D_fake = self.D(G_)
                 D_fake_loss = torch.mean(D_fake)
 
@@ -232,7 +239,8 @@ class WGAN_GP(object):
         # save images and display if set
         utils.save_images(self.vis, images, [image_frame_dim, image_frame_dim], 
                         self.result_dir + '/' + self.dataset + '/' + self.model_name + '/' 
-                        + self.model_name + '_epoch%03d' % epoch + '.png', env=self.env_display,
+                        + self.model_name + '_epoch%03d' % epoch + '.png', 
+                        env=self.env_display,
                         visualize=self.visualize)
 
 

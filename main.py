@@ -11,11 +11,11 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='small-imagenet',
                         choices=['imagenet', 'small-imagenet', 'mnist', 'fashion-mnist', 'celebA'], 
                         help='The name of dataset')
-    parser.add_argument('--discriminator', type=str, default='dcgan',
-                        choices=['infogan', 'dcgan'], 
+    parser.add_argument('--discriminator', type=str, default='resnet',
+                        choices=['resnet', 'infogan', 'dcgan'], 
                         help='Discriminator architecture')
-    parser.add_argument('--generator', type=str, default='dcgan',
-                        choices=['infogan', 'dcgan'], 
+    parser.add_argument('--generator', type=str, default='resnet',
+                        choices=['resblock','infogan', 'dcgan'], 
                         help='Generator architecture')
     parser.add_argument('--epoch', type=int, default=1500000, 
                         help='The number of epochs to run')

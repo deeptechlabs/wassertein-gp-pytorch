@@ -1,10 +1,18 @@
 import utils
 import torch
 import torch.nn as nn
+import functools
+import numpy as np
 
+from torch.nn import init
+from torch.optim import lr_scheduler
 from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+
+from models import *
+from utils import *
+
 
 class INFOGAN_discriminator(nn.Module):
     # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
@@ -31,8 +39,6 @@ class INFOGAN_discriminator(nn.Module):
             self.input_width = 64
             self.input_channel = 3
             self.output_channel = 1
-
-
 
         self.conv = nn.Sequential(
             nn.Conv2d(self.input_channel, 64, 4, 2, 1),
@@ -91,3 +97,102 @@ class DCGAN_discriminator(nn.Module):
             output = self.main(input)
 
         return output.view(-1, 1).squeeze(1)
+
+# Defines the PatchGAN discriminator with the specified arguments.
+class NLayerDiscriminator(nn.Module):
+    def __init__(self, ngpu, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False):
+        super(NLayerDiscriminator, self).__init__()
+        self.ngpu = ngpu
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        kw = 4
+        padw = 1
+        sequence = [
+            nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
+            nn.LeakyReLU(0.2, True)
+        ]
+
+        nf_mult = 1
+        nf_mult_prev = 1
+        for n in range(1, n_layers):
+            nf_mult_prev = nf_mult
+            nf_mult = min(2**n, 8)
+            sequence += [
+                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult,
+                          kernel_size=kw, stride=2, padding=padw, bias=use_bias),
+                norm_layer(ndf * nf_mult),
+                nn.LeakyReLU(0.2, True)
+            ]
+
+        nf_mult_prev = nf_mult
+        nf_mult = min(2**n_layers, 8)
+        sequence += [
+            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult,
+                      kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            norm_layer(ndf * nf_mult),
+            nn.LeakyReLU(0.2, True)
+        ]
+
+        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]
+
+        if use_sigmoid:
+            sequence += [nn.Sigmoid()]
+
+        self.model = nn.Sequential(*sequence)
+
+    def forward(self, input):
+        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+            output = nn.parallel.data_parallel(self.model, input, range(self.ngpu))
+        else:
+            output = self.model(input)
+        return output
+
+class PixelDiscriminator(nn.Module):
+    def __init__(self, ngpu,  input_nc, ndf=64, norm_layer=nn.BatchNorm2d, use_sigmoid=False):
+        super(PixelDiscriminator, self).__init__()
+        self.ngpu = ngpu
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        self.net = [
+            nn.Conv2d(input_nc, ndf, kernel_size=1, stride=1, padding=0),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv2d(ndf, ndf * 2, kernel_size=1, stride=1, padding=0, bias=use_bias),
+            norm_layer(ndf * 2),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv2d(ndf * 2, 1, kernel_size=1, stride=1, padding=0, bias=use_bias)]
+
+        if use_sigmoid:
+            self.net.append(nn.Sigmoid())
+
+        self.net = nn.Sequential(*self.net)
+
+    def forward(self, input):
+        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+            output = nn.parallel.data_parallel(self.net, input, range(self.ngpu))
+        else:
+            output = self.net(input)
+        return output
+
+def build_discriminator(ngpu, input_nc=3, ndf=64, which_model_netD='basic',
+             n_layers_D=3, norm='batch', use_sigmoid=False, init_type='normal'):
+    netD = None
+    norm_layer = get_norm_layer(norm_type=norm)
+
+    if which_model_netD == 'basic':
+        netD = NLayerDiscriminator(ngpu, input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
+    elif which_model_netD == 'n_layers':
+        netD = NLayerDiscriminator(ngpu, input_nc, ndf, n_layers_D, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
+    elif which_model_netD == 'pixel':
+        netD = PixelDiscriminator(ngpu, input_nc, ndf, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
+    else:
+        raise NotImplementedError('Discriminator model name [%s] is not recognized' %
+                                  which_model_netD)
+    init_weights(netD, init_type=init_type)
+    return netD
+

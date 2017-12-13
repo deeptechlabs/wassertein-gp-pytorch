@@ -5,9 +5,10 @@ import torch.nn as nn
 import numpy as np
 import scipy.misc
 import imageio
-import matplotlib.pyplot as plt
-from torchvision import datasets, transforms
+import functools
 
+from torchvision import datasets, transforms
+from torch.nn import init
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
@@ -167,41 +168,4 @@ def initialize_weights(net):
         elif isinstance(m, nn.Linear):
             m.weight.data.normal_(0, 0.02)
             m.bias.data.zero_()
-
-
-def dcgan_weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
-
-
-"""
-def save_images(real_data, fake_data, filename):
-    assert real_data.shape == fake_data.shape
-
-    import warnings
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    import numpy as np
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots()
-    plt.scatter(fake_data[:,0], fake_data[:,1], color='red', label='noise (fake, sampled)')
-    plt.scatter(real_data[:,0], real_data[:,1], color='blue', label='hidden (real, inferred)')
-    #plt.axis('equal')
-    plt.legend(loc='upper right', fancybox=True, shadow=True, fontsize=11)
-    plt.grid(True)
-    plt.xlim(-5, 5)
-    plt.ylim(-5, 5)
-    plt.minorticks_on()
-    plt.xlabel('x', fontsize=14, color='black')
-    plt.ylabel('y', fontsize=14, color='black')
-    plt.title('z samples (of first two dimensions)')
-    plt.savefig(filename)
-    plt.close()
-"""
 
