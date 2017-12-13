@@ -179,8 +179,8 @@ class PixelDiscriminator(nn.Module):
             output = self.net(input)
         return output
 
-def build_discriminator(ngpu, input_nc=3, ndf=64, which_model_netD='basic',
-             n_layers_D=3, norm='batch', use_sigmoid=False, init_type='normal'):
+def build_discriminator(ngpu, ndf=64, input_nc=3, which_model_netD='n_layers',
+             n_layers_D=3, norm='batch', use_sigmoid=False, init_type='kaiming'):
     netD = None
     norm_layer = get_norm_layer(norm_type=norm)
 

@@ -109,7 +109,7 @@ class DCGAN_generator(nn.Module):
         )
 
     def forward(self, input):
-        input = input.view(-1, self.nz, 1, 1)
+        #input = input.view(-1, self.nz, 1, 1)
         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
@@ -147,7 +147,7 @@ class ResnetGenerator(nn.Module):
         mult = 2**n_downsampling
         for i in range(n_blocks):
             model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
-        #print("test")
+
         for i in range(n_downsampling):
             mult = 2**(n_downsampling - i)
             model += [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
@@ -176,8 +176,7 @@ class ResnetGenerator(nn.Module):
 # if |num_downs| == 7, image of size 128x128 will become of size 1x1
 # at the bottleneck
 class UnetGenerator(nn.Module):
-    def __init__(self, ngpu, input_nc, output_nc, num_downs, ngf=64,
-                 norm_layer=nn.BatchNorm2d, use_dropout=False):
+    def __init__(self, ngpu, input_nc, output_nc, num_downs, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetGenerator, self).__init__()
         self.ngpu = ngpu
 
@@ -200,7 +199,7 @@ class UnetGenerator(nn.Module):
         return output
 
 
-def build_generator(ngpu, input_nc=3, output_nc=3, ngf=64, which_model_netG='resnet_9blocks', norm='batch', use_dropout=False, init_type='normal'):
+def build_generator(ngpu, ngf=64, input_nc=3, output_nc=3, which_model_netG='resnet_9blocks', norm='batch', use_dropout=False, init_type='kaiming'):
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
 

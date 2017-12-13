@@ -83,6 +83,7 @@ class WGAN_GP(object):
 
         # fixed noise
         if self.gpu_mode:
+            #self.sample_z_ = Variable(torch.rand(self.batch_size, 3).cuda(), volatile=True)
             self.sample_z_ = Variable(torch.rand((self.batch_size, 3, 64, 64)).cuda(), volatile=True)
             #self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim, 1, 1)).cuda(), volatile=True)
         else:
@@ -114,6 +115,7 @@ class WGAN_GP(object):
                 #z_ = torch.rand((self.batch_size, self.z_dim, 1, 1))
 
                 z_ = torch.rand((self.batch_size, 3, 64, 64))
+                #z_ = torch.rand(self.batch_size, 3)
 
                 if self.gpu_mode:
                     x_, z_ = Variable(x_.cuda()), Variable(z_.cuda())
