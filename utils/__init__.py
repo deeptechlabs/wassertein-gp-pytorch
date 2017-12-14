@@ -6,6 +6,7 @@ import numpy as np
 import scipy.misc
 import imageio
 import functools
+import matplotlib.pyplot as plt
 
 from torchvision import datasets, transforms
 from torch.nn import init
