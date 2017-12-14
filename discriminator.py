@@ -17,58 +17,39 @@ from utils import *
 class INFOGAN_discriminator(nn.Module):
     # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
     # Architecture : (64)4c2s-(128)4c2s_BL-FC1024_BL-FC1_S
-    def __init__(self, dataset='small-imagenet'):
+    def __init__(self, nc=3, ndf=64):
         super(INFOGAN_discriminator, self).__init__()
-        if dataset == 'mnist' or dataset == 'fashion-mnist':
-            self.input_height = 28
-            self.input_width = 28
-            self.input_channel = 1
-            self.output_channel = 1
-        elif dataset == 'celebA':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_channel = 3
-            self.output_channel = 1
-        elif dataset == 'imagenet':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_channel = 3
-            self.output_channel = 1
-        elif dataset == 'small-imagenet':
-            self.input_height = 64
-            self.input_width = 64
-            self.input_channel = 3
-            self.output_channel = 1
-
+        self.nc = nc
+        self.ndf = ndf
         self.conv = nn.Sequential(
-            nn.Conv2d(self.input_channel, 64, 4, 2, 1),
+            nn.Conv2d(self.nc, 64, 4, 2, 1),
             nn.LeakyReLU(0.2),
             nn.Conv2d(64, 128, 4, 2, 1),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2),
         )
         self.fc = nn.Sequential(
-            nn.Linear(128 * (self.input_height // 4) * (self.input_width // 4), 1024),
+            nn.Linear(128 * (self.ndf // 4) * (self.ndf // 4), 1024),
             nn.BatchNorm1d(1024),
             nn.LeakyReLU(0.2),
-            nn.Linear(1024, self.output_channel),
+            nn.Linear(1024, self.nc),
             nn.Sigmoid(),
         )
         utils.initialize_weights(self)
 
     def forward(self, input):
         output = self.conv(input)
-        output = output.view(-1, 128 * (self.input_height // 4) * (self.input_width // 4))
+        output = output.view(-1, 128 * (self.ndf // 4) * (self.ndf // 4))
         output = self.fc(output)
         return output
 
 
 class DCGAN_discriminator(nn.Module):
-    def __init__(self, ngpu, input_channels=3, input_dimensions=64):
+    def __init__(self, ngpu, nc=3, ndf=64):
         super(DCGAN_discriminator, self).__init__()
         self.ngpu = ngpu
-        self.nc = input_channels
-        self.ndf = input_dimensions
+        self.nc = nc
+        self.ndf = ndf
         self.main = nn.Sequential(
             # input is (nc) x 64 x 64
             nn.Conv2d(self.nc, self.ndf, 4, 2, 1, bias=False),
@@ -95,8 +76,8 @@ class DCGAN_discriminator(nn.Module):
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
-
-        return output.view(-1, 1).squeeze(1)
+        #return output.view(-1, 1).squeeze(1)
+        return output
 
 # Defines the PatchGAN discriminator with the specified arguments.
 class NLayerDiscriminator(nn.Module):
@@ -179,7 +160,7 @@ class PixelDiscriminator(nn.Module):
             output = self.net(input)
         return output
 
-def build_discriminator(ngpu, ndf=64, input_nc=3, which_model_netD='n_layers',
+def build_discriminator(ngpu, ndf=64, which_model_netD='n_layers', input_nc=3,
              n_layers_D=3, norm='batch', use_sigmoid=False, init_type='kaiming'):
     netD = None
     norm_layer = get_norm_layer(norm_type=norm)

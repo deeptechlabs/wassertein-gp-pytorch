@@ -8,8 +8,7 @@ import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+import datetime
 
 from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
@@ -24,10 +23,12 @@ from discriminator import *
 class WGAN_GP(object):
     def __init__(self, args):
         # parameters
-        self.model_name = 'wgan-gp'
+        self.model_name = args.model_name
         self.epoch = args.epoch
         self.sample_num = args.sample_num
         self.z_dim = args.z_dim
+        self.input_channels = args.input_channels
+        self.output_channels = args.output_channels
         self.batch_size = args.batch_size
         self.save_dir = args.save_dir
         self.result_dir = args.result_dir
@@ -38,28 +39,38 @@ class WGAN_GP(object):
         self.discriminator_arch = args.discriminator
         self.nThreads = args.nThreads
         self.gpu_mode = args.gpu_mode
-        self.lambda_ = args.lambda_grad_penalty #0.25
-        self.n_critic = args.n_critic # 5 the number of iterations of the critic per generator iteration
-        self.visualize = args.visualize # 5 the number of iterations of the critic per generator iteration
+        self.lambda_ = args.lambda_grad_penalty
+        self.n_critic = args.n_critic
+        self.visualize = args.visualize 
         self.ngpu = args.ngpu
-        self.env_display = str(args.env_display)
+        self.env_display = str(args.dataset)
         self.vis = Visdom(server=args.visdom_server, port=args.visdom_port)
         self.calculate_inception = args.calculate_inception
 
         # networks init
         if self.generator_arch == 'infogan':
-            self.G = INFOGAN_generator(self.dataset, self.z_dim)
+            self.G = INFOGAN_generator(nc=self.input_channels, ngf=self.z_dim)
         elif self.generator_arch == 'dcgan':
-            self.G = DCGAN_generator(self.ngpu)
-        elif self.generator_arch == 'resnet':
-            self.G = build_generator(self.ngpu)
+            self.G = DCGAN_generator(self.ngpu, nc=self.input_channels, ngf=self.z_dim)
+        elif self.generator_arch == 'resnet_6blocks':
+            self.G = build_generator(self.ngpu, ngf=self.z_dim, which_model_netG='resnet_6blocks')
+        elif self.generator_arch == 'resnet_9blocks':
+            self.G = build_generator(self.ngpu, ngf=self.z_dim, which_model_netG='resnet_9blocks')
+        elif self.generator_arch == 'unet_128':
+            self.G = build_generator(self.ngpu, ngf=self.z_dim, which_model_netG='unet_128')
+        elif self.generator_arch == 'unet_256':
+            self.G = build_generator(self.ngpu, ngf=self.z_dim, which_model_netG='unet_256')
 
         if self.discriminator_arch == 'infogan':
-            self.D = INFOGAN_discriminator(self.dataset)
+            self.D = INFOGAN_discriminator(nc=self.input_channels, ndf=self.z_dim)
         elif self.discriminator_arch == 'dcgan':
-            self.D = DCGAN_discriminator(self.ngpu)
-        elif self.discriminator_arch == 'resnet':
-            self.D = build_discriminator(self.ngpu)
+            self.D = DCGAN_discriminator(self.ngpu, nc=self.input_channels, ndf=self.z_dim)
+        elif self.discriminator_arch == 'basic':
+            self.D = build_discriminator(self.ngpu, ndf=self.z_dim, which_model_netD='basic')
+        elif self.discriminator_arch == 'n_layers':
+            self.D = build_discriminator(self.ngpu, ndf=self.z_dim, which_model_netD='n_layers')
+        elif self.discriminator_arch == 'pixel':
+            self.D = build_discriminator(self.ngpu, ndf=self.z_dim, which_model_netD='pixel')
 
         self.G_optimizer = optim.Adam(self.G.parameters(), lr=args.lrG, betas=(args.beta1, args.beta2))
         self.D_optimizer = optim.Adam(self.D.parameters(), lr=args.lrD, betas=(args.beta1, args.beta2))
@@ -83,11 +94,10 @@ class WGAN_GP(object):
 
         # fixed noise
         if self.gpu_mode:
-            #self.sample_z_ = Variable(torch.rand(self.batch_size, 3).cuda(), volatile=True)
-            self.sample_z_ = Variable(torch.rand((self.batch_size, 3, 64, 64)).cuda(), volatile=True)
+            self.sample_z_ = Variable(torch.rand((self.batch_size, self.input_channels, self.batch_size, self.batch_size)).cuda(), volatile=True)
             #self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim, 1, 1)).cuda(), volatile=True)
         else:
-            self.sample_z_ = Variable(torch.rand((self.batch_size, 3, 64, 64)), volatile=True)
+            self.sample_z_ = Variable(torch.rand((self.batch_size, self.input_channels, self.batch_size, self.batch_size)), volatile=True)
             #self.sample_z_ = Variable(torch.rand((self.batch_size, self.z_dim, 1, 1)), volatile=True)
 
     def train(self):
@@ -98,11 +108,12 @@ class WGAN_GP(object):
         self.train_hist['total_time'] = []
 
         if self.gpu_mode:
-            self.y_real_, self.y_fake_ = Variable(torch.ones((self.batch_size, 3, 1, 1)).cuda()), Variable(torch.zeros((self.batch_size, 3, 1, 1)).cuda())
+            self.y_real_, self.y_fake_ = Variable(torch.ones((self.batch_size, self.input_channels, self.batch_size, self.batch_size)).cuda()), Variable(torch.zeros((self.batch_size, self.input_channels, self.batch_size, self.batch_size)).cuda())
         else:
-            self.y_real_, self.y_fake_ = Variable(torch.ones((self.batch_size, 3, 1, 1))), Variable(torch.zeros((self.batch_size, 3, 1, 1)))
+            self.y_real_, self.y_fake_ = Variable(torch.ones((self.batch_size, self.input_channels, self.batch_size, self.batch_size))), Variable(torch.zeros((self.batch_size, self.input_channels, self.batch_size, self.batch_size)))
 
         self.D.train()
+
         print('training start!!')
         start_time = time.time()
         for epoch in range(self.epoch):
@@ -112,9 +123,9 @@ class WGAN_GP(object):
                 if iter == self.data_loader.dataset.__len__() // self.batch_size:
                     break
 
-                #z_ = torch.rand((self.batch_size, self.z_dim, 1, 1))
 
-                z_ = torch.rand((self.batch_size, 3, 64, 64))
+                z_ = torch.rand((self.batch_size, self.input_channels, self.batch_size, self.batch_size))
+                #z_ = torch.rand((self.batch_size, self.z_dim, 1, 1))
                 #z_ = torch.rand(self.batch_size, 3)
 
                 if self.gpu_mode:

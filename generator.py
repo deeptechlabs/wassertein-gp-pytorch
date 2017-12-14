@@ -8,86 +8,45 @@ from torchvision import datasets, transforms
 from models import *
 
 class INFOGAN_generator(nn.Module):
-    def __init__(self, dataset='small-imagenet', z_dim=512):
+    def __init__(self, nc=3, ngf=64):
         super(INFOGAN_generator, self).__init__()
-        self.dataset = dataset
-        self.z_dim = z_dim
-        if self.dataset == 'mnist' or self.dataset == 'fashion-mnist':
-            self.output_height = 28
-            self.output_width = 28
-            self.input_channel = z_dim
-            self.output_channel = 1 # if black and while it's 1
-        elif self.dataset == 'celebA':
-            self.output_height = 64
-            self.output_width = 64
-            self.input_channel = z_dim
-            self.output_channel = 3
-        elif self.dataset == 'imagenet':
-            self.input_height = 1
-            self.input_width = 1
-            self.input_channel = self.z_dim # this is hidden size
-            self.output_height = 64 # this is size of height
-            self.output_width = 64 # this is size of image w
-            self.output_channel = 3 # this is color
-        elif self.dataset == 'small-imagenet':
-            self.input_height = 1
-            self.input_width = 1
-            self.input_channel = self.z_dim # this is hidden size
-            self.output_height = 64 # this is size of height
-            self.output_width = 64 # this is size of image w
-            self.output_channel = 3 # this is color
-
+        self.nc = nc
+        self.ngf = ngf
 
         self.fc = nn.Sequential(
-            nn.Linear(self.input_channel, 1024),
+            nn.Linear(self.ngf, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, 128 * (self.output_height // 4) * (self.output_width // 4)),
-            nn.BatchNorm1d(128 * (self.output_height // 4) * (self.output_width // 4)),
+            nn.Linear(1024, 128 * (self.ngf // 4) * (self.ngf // 4)),
+            nn.BatchNorm1d(128 * (self.ngf // 4) * (self.ngf // 4)),
             nn.ReLU(),
         )
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(128, 64, 4, 2, 1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.ConvTranspose2d(64, self.output_channel, 4, 2, 1),
+            nn.ConvTranspose2d(64, self.nc, 4, 2, 1),
             nn.Sigmoid(),
         )
         utils.initialize_weights(self)
 
     def forward(self, input):
-        if self.dataset == 'mnist':
-            output = self.fc(input)
-
-        if self.dataset == 'fashion-mnist':
-            output = self.fc(input)
-
-        elif self.dataset == 'celebA':
-            output = self.fc(input)
-
-        elif self.dataset == 'small-imagenet':
-            output = input.view(-1, self.input_channel * self.input_height * self.input_width)
-            output = self.fc(output)
-
-        elif self.dataset == 'imagenet':
-            output = input.view(-1, self.input_channel * self.input_height * self.input_width)
-            output = self.fc(output)
-
-        output = output.view(-1, 128, (self.output_height // 4), (self.output_width // 4))
+        output = input.view(-1, self.ngf, 1, 1)
+        output = self.fc(output)
+        output = output.view(-1, 128, (self.ngf // 4), (self.ngf // 4))
         output = self.deconv(output)
         return output
 
 
 class DCGAN_generator(nn.Module):
-    def __init__(self, ngpu, n_zim=512, output_channel=3, input_dimensions=64):
+    def __init__(self, ngpu, nc=3, ngf=64):
         super(DCGAN_generator, self).__init__()
         self.ngpu = ngpu
-        self.nz = n_zim # latent variable
-        self.ngf = input_dimensions
-        self.nc = output_channel
+        self.ngf = ngf
+        self.nc = nc
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(     self.nz, self.ngf * 8, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(     self.ngf, self.ngf * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(self.ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
@@ -199,7 +158,7 @@ class UnetGenerator(nn.Module):
         return output
 
 
-def build_generator(ngpu, ngf=64, input_nc=3, output_nc=3, which_model_netG='resnet_9blocks', norm='batch', use_dropout=False, init_type='kaiming'):
+def build_generator(ngpu, ngf=64, which_model_netG='resnet_9blocks', input_nc=3, output_nc=3, norm='batch', use_dropout=False, init_type='kaiming'):
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
 
